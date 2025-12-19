@@ -1,0 +1,821 @@
+<!doctype html>
+<html lang="de">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>SDL Amortisationsrechner</title>
+  <style>
+    :root {
+      --bg: #fbfefb;
+      --card: #ffffff;
+      --muted: #5c6658;
+      --accent: #4dac42;
+      --accent-2: #62c158;
+      --border: #d9e6d8;
+      --radius: 16px;
+      --shadow: 0 12px 50px rgba(0,0,0,0.08);
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font: 16px/1.5 "Inter", "Segoe UI", system-ui, -apple-system, sans-serif;
+      background: radial-gradient(circle at 15% 20%, rgba(77,172,66,0.08), transparent 35%),
+                  radial-gradient(circle at 85% 10%, rgba(98,193,88,0.10), transparent 30%),
+                  var(--bg);
+      color: #1f2a1f;
+      min-height: 100vh;
+    }
+    h1, h2, h3 { margin: 0 0 8px; font-weight: 800; letter-spacing: 0.2px; }
+    p { margin: 0 0 12px; color: var(--muted); }
+    .wrap { max-width: 1200px; margin: auto; padding: 28px 18px 60px; }
+    .intro { display: grid; gap: 8px; margin-bottom: 20px; }
+    .grid { display: grid; gap: 18px; }
+    .two { grid-template-columns: repeat(auto-fit,minmax(360px,1fr)); gap: 16px; align-items: stretch; }
+    .two > .card { height: 100%; }
+    .card {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 16px;
+      box-shadow: var(--shadow);
+    }
+    label { display: grid; gap: 6px; color: #233023; font-weight: 650; font-size: 0.95rem; }
+    label input, label select, label textarea { width: 100%; }
+    label span { color: var(--muted); font-weight: 500; font-size: 0.88rem; }
+    input, select, textarea {
+      background: #f4fbf4;
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      color: #1f2a1f;
+      padding: 10px 12px;
+      font: inherit;
+    }
+    input[type="number"] { appearance: textfield; }
+    input:focus, select:focus, textarea:focus { outline: 2px solid var(--accent); outline-offset: 1px; }
+    .row { display: grid; grid-template-columns: repeat(auto-fit,minmax(180px,1fr)); gap: 10px; }
+    .row + .row { margin-top: 12px; }
+    .row-block { display: grid; gap: 12px; margin-top: 10px; }
+    .muted { color: var(--muted); font-size: 0.9rem; }
+    table { width: 100%; border-collapse: collapse; color: #1f2a1f; background: #f8fcf8; border-radius: 12px; overflow: hidden; }
+    th, td { border-bottom: 1px solid var(--border); padding: 8px 6px; text-align: left; }
+    th { color: var(--muted); font-weight: 700; }
+    tbody tr:last-child td { border-bottom: none; }
+    td input, td select { width: 100%; }
+    .table-wrap { overflow-x: auto; border-radius: 12px; }
+    .btn {
+      appearance: none;
+      border: none;
+      border-radius: 12px;
+      padding: 10px 14px;
+      cursor: pointer;
+      font-weight: 700;
+      color: #0d140d;
+      background: linear-gradient(120deg, var(--accent), var(--accent-2));
+      box-shadow: 0 14px 40px rgba(77,172,66,0.25);
+    }
+    .btn.secondary {
+      color: #1f2a1f;
+      background: transparent;
+      border: 1px solid var(--border);
+      box-shadow: none;
+    }
+    .actions { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; }
+    .pill { display: inline-flex; align-items: center; gap: 8px; padding: 8px 12px; background: #edf7ed; border: 1px solid var(--border); border-radius: 999px; color: #264226; }
+    .highlight { color: var(--accent); font-weight: 800; }
+    .results-grid { display: grid; grid-template-columns: repeat(auto-fit,minmax(240px,1fr)); gap: 12px; margin-top: 12px; }
+    .metric { background: #f2fbf2; border: 1px solid var(--border); border-radius: 14px; padding: 12px; }
+    .metric h3 { font-size: 1rem; margin-bottom: 6px; color: var(--muted); }
+    .metric .value { font-size: 1.4rem; font-weight: 800; }
+    canvas { width: 100%; max-height: 400px; }
+    .tag { padding: 4px 10px; border-radius: 999px; background: #edf7ed; color: #264226; display: inline-block; font-weight: 700; font-size: 0.85rem; border:1px solid var(--border); }
+    .table-actions { display: flex; justify-content: space-between; align-items: center; gap: 8px; margin-top: 8px; flex-wrap: wrap; }
+    .remove { cursor: pointer; color: var(--accent-2); font-weight: 800; }
+    .footer-note { color: var(--muted); margin-top: 10px; font-size: 0.9rem; }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="intro">
+      <div>
+        <div class="pill">SDL Business Case</div>
+        <h1>Amortisation &amp; Sensitivität</h1>
+        <p>Berechne die Amortisation von Systemdienstleistungs-Anlagen mit intuitivem Preisband, Degeneration und Markt-Preis-Effekten. Die Eingabe ist bewusst einfach gehalten, damit auch ungeübtes Personal schnell zu belastbaren Zahlen kommt.</p>
+      </div>
+      <div class="actions">
+        <button class="btn" id="btnCalc">Jetzt berechnen</button>
+        <div class="tag" id="scenarioTag">Szenario: 50%</div>
+      </div>
+    </div>
+
+    <div class="grid two">
+      <section class="card">
+        <h2>Projekt</h2>
+        <p class="muted">Basisdaten für Export und Versionsverwaltung.</p>
+        <div class="row-block">
+          <div class="row">
+            <label>Projekt
+              <input type="text" id="projectName" placeholder="Projektname">
+            </label>
+            <label>Name
+              <input type="text" id="lastName" placeholder="Nachname">
+            </label>
+            <label>Vorname
+              <input type="text" id="firstName" placeholder="Vorname">
+            </label>
+          </div>
+          <div class="row">
+            <label>Adresse
+              <input type="text" id="address" placeholder="Rechnungsadresse">
+            </label>
+            <label>Objektadresse
+              <input type="text" id="siteAddress" placeholder="Standort der Anlage">
+            </label>
+          </div>
+          <div class="row">
+            <label>Notizen
+              <textarea id="notes" rows="3" placeholder="Stichworte zum Projekt"></textarea>
+            </label>
+          </div>
+          <div class="row" style="align-items:center;">
+            <label>Gespeicherte Projekte
+              <select id="projectSelect"></select>
+            </label>
+            <div class="actions" style="gap:8px;">
+              <button class="btn secondary" id="btnSaveProject">Projekt speichern</button>
+              <button class="btn secondary" id="btnLoadProject">Projekt laden</button>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section class="card">
+        <h2>Einnahmen &amp; Wahrscheinlichkeiten</h2>
+        <p class="muted">Trage je einen erwarteten Preis ein und eine Bandbreite für Unsicherheit. Der Szenario-Schieber wechselt intuitiv von konservativ (links) zu optimistisch (rechts).</p>
+        <div class="row-block">
+          <div class="row">
+            <label>Vertragliche Leistung (MW)
+              <input type="number" step="0.01" id="capacity" value="10">
+            </label>
+            <label>Abrechnungsintervall Leistungspreis
+              <select id="capacityInterval">
+              <option value="monat">CHF/MW · Monat</option>
+              <option value="jahr">CHF/MW · Jahr</option>
+            </select>
+            </label>
+            <label>Leistungspreis erwartet (CHF/MW)
+              <input type="number" step="0.01" id="powerBase" value="2800">
+            </label>
+            <label>Unsicherheitsband Leistung (%)
+              <input type="number" step="0.1" id="powerBand" value="25">
+              <span class="muted">0 % = sicher, 25 % = ±25 % rund um den erwarteten Preis.</span>
+            </label>
+          </div>
+          <div class="row">
+            <label>Arbeitspreis erwartet (CHF/MWh)
+              <input type="number" step="0.01" id="energyBase" value="110">
+            </label>
+            <label>Unsicherheitsband Arbeit (%)
+              <input type="number" step="0.1" id="energyBand" value="20">
+            </label>
+            <label>Aktivierungen / Jahr
+              <input type="number" step="1" id="activations" value="20">
+            </label>
+            <label>Energie je Aktivierung (MWh)
+              <input type="number" step="0.1" id="energyPerActivation" value="25">
+            </label>
+          </div>
+          <div class="row">
+            <label>Szenario-Schieber (konservativ → optimistisch)
+              <input type="range" id="quantile" min="0" max="100" value="50">
+              <span class="muted">Stellt die Preise innerhalb der Bandbreite ein. 50 % = erwarteter Preis.</span>
+            </label>
+            <label>Degeneration / Jahr (%)
+              <input type="number" step="0.1" id="degradation" value="1.5">
+            </label>
+            <label>Preis-Eskalation Markt / Jahr (%)
+              <input type="number" step="0.1" id="priceEscalation" value="1.5">
+            </label>
+            <label>Förderungen / Steuern (CHF/Jahr, + oder -)
+              <input type="number" step="0.01" id="grants" value="0">
+            </label>
+          </div>
+        </div>
+        </div>
+        <div class="card" style="background:#f8fcf8; margin-top:10px;">
+          <h3>Kurze Erklärung</h3>
+          <ul style="margin:0; padding-left:20px; color:#3a4738;">
+            <li><strong>Szenario-Schieber:</strong> Links = konservativ (niedrigere Preise), Rechts = optimistisch (höhere Preise) innerhalb der gewählten Bandbreite.</li>
+            <li><strong>Bandbreite:</strong> Gibt an, wie stark Preise schwanken können. Beispiel: 25 % bedeutet ±25 % um den erwarteten Preis.</li>
+            <li><strong>Degeneration:</strong> Jährlicher Leistungsverlust der Anlage.</li>
+            <li><strong>Preis-Eskalation:</strong> Erwarteter Marktanstieg der Preise pro Jahr.</li>
+          </ul>
+        </div>
+      </section>
+
+      <section class="card">
+        <h2>CAPEX &amp; OPEX</h2>
+        <p class="muted">Lege beliebig viele Positionen an. OPEX können in Intervallen (z.B. alle 3 Jahre) hinterlegt werden.</p>
+
+        <div class="table-actions">
+          <h3>CAPEX</h3>
+          <button class="btn secondary" id="addCapex">Position hinzufügen</button>
+        </div>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr><th>Position</th><th>Betrag (CHF)</th><th>Jahr</th><th></th></tr>
+            </thead>
+            <tbody id="capexBody"></tbody>
+          </table>
+        </div>
+
+        <div class="table-actions">
+          <h3>OPEX</h3>
+          <button class="btn secondary" id="addOpex">Position hinzufügen</button>
+        </div>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr><th>Position</th><th>Betrag (CHF)</th><th>Intervall (Jahre)</th><th>Startjahr</th><th></th></tr>
+            </thead>
+            <tbody id="opexBody"></tbody>
+          </table>
+        </div>
+        <div class="row" style="margin-top:10px;">
+          <label>Zeithorizont (Jahre)
+            <input type="number" id="years" value="15" min="1">
+          </label>
+          <label>Diskontsatz für NPV (%)
+            <input type="number" id="discount" value="5" step="0.1">
+          </label>
+        </div>
+      </section>
+    </div>
+
+    <section class="card" style="margin-top:16px;">
+      <h2>Ergebnisse &amp; Sensitivität</h2>
+      <p class="muted">Amortisationsjahr, Cashflows und Kennzahlen. Die Sensitivität kombiniert Preis- und Aktivierungsfaktoren.</p>
+      <div class="results-grid" id="metrics"></div>
+      <div class="grid two" style="margin-top:14px;">
+        <div class="card" style="background:#f8fcf8;">
+          <h3>Cashflow &amp; kumuliert</h3>
+          <canvas id="cashChart" aria-label="Cashflow Diagramm"></canvas>
+        </div>
+        <div class="card" style="background:#f8fcf8;">
+          <h3>Sensitivität NPV (Preis / Aktivierung)</h3>
+          <table>
+            <thead><tr><th>Preisfaktor</th><th>Aktivierungen</th><th>NPV (CHF)</th></tr></thead>
+            <tbody id="sensitivityBody"></tbody>
+          </table>
+          <p class="footer-note">Faktoren beziehen sich auf den aktuellen Szenario-Wert des Schiebers und die hinterlegten Aktivierungen.</p>
+        </div>
+      </div>
+    </section>
+
+    <section class="card" style="margin-top:16px;">
+      <h2>Export</h2>
+      <p class="muted">Lade eine HTML-, XML-, TXT- oder textbasierte DOCX-Vorlage hoch. Tipp: In Word als "Webseite (gefiltert)" oder "Word XML" speichern, damit Platzhalter als Klartext bleiben. Export erfolgt als .doc (HTML-Inhalt) für maximale Öffnungs-Kompatibilität.</p>
+      <div class="row-block">
+        <div class="row">
+          <label>Vorlage hochladen (.html / .htm / .xml / .txt / .docx)
+            <input type="file" id="templateInput" accept=".html,.htm,.xml,.txt,.docx">
+            <span class="muted">Platzhalter im Format {{bezeichner}} verwenden.</span>
+          </label>
+          <label>Aktueller Status
+            <input type="text" id="templateStatus" value="Keine Vorlage geladen" readonly>
+          </label>
+        </div>
+        <div class="row">
+          <button class="btn" id="btnExportDoc" disabled>Word exportieren</button>
+          <div class="muted">Die Vorlage kann nach dem Laden beliebig oft genutzt werden.</div>
+        </div>
+      </div>
+      <div class="card" style="background:#f8fcf8; margin-top:10px;">
+        <h3>Verfügbare Platzhalter</h3>
+        <ul style="margin:0; padding-left:20px; color:#3a4738;" id="placeholderList"></ul>
+        <p class="footer-note">Tabellen-Platzhalter wie {{cashflow_table}} werden als einfache Texttabelle eingesetzt.</p>
+      </div>
+    </section>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <script>
+    const capexBody = document.getElementById('capexBody');
+    const opexBody = document.getElementById('opexBody');
+    const metricsBox = document.getElementById('metrics');
+    const sensitivityBody = document.getElementById('sensitivityBody');
+    const scenarioTag = document.getElementById('scenarioTag');
+    const projectSelect = document.getElementById('projectSelect');
+    const btnSaveProject = document.getElementById('btnSaveProject');
+    const btnLoadProject = document.getElementById('btnLoadProject');
+    const templateInput = document.getElementById('templateInput');
+    const templateStatus = document.getElementById('templateStatus');
+    const btnExportDoc = document.getElementById('btnExportDoc');
+    const placeholderList = document.getElementById('placeholderList');
+    let chart;
+    let templateContent = '';
+    let lastCalc = null;
+
+    const placeholderMeta = [
+      { key: 'scenario_percent', label: 'Aktuelles Szenario (%)' },
+      { key: 'power_price_chf', label: 'Leistungspreis (CHF/MW)' },
+      { key: 'energy_price_chf', label: 'Arbeitspreis (CHF/MWh)' },
+      { key: 'capacity_mw', label: 'Vertragliche Leistung (MW)' },
+      { key: 'activations_per_year', label: 'Aktivierungen/Jahr' },
+      { key: 'energy_per_activation_mwh', label: 'Energie je Aktivierung (MWh)' },
+      { key: 'power_base_chf', label: 'Leistungspreis erwartet' },
+      { key: 'power_band_percent', label: 'Bandbreite Leistung (%)' },
+      { key: 'energy_base_chf', label: 'Arbeitspreis erwartet' },
+      { key: 'energy_band_percent', label: 'Bandbreite Arbeit (%)' },
+      { key: 'price_escalation_percent', label: 'Preis-Eskalation (% p.a.)' },
+      { key: 'degradation_percent', label: 'Degeneration (% p.a.)' },
+      { key: 'discount_percent', label: 'Diskontsatz (%)' },
+      { key: 'grants_chf', label: 'Förderungen/Steuern (CHF/Jahr)' },
+      { key: 'project', label: 'Projekt' },
+      { key: 'first_name', label: 'Vorname' },
+      { key: 'last_name', label: 'Name' },
+      { key: 'address', label: 'Adresse' },
+      { key: 'site_address', label: 'Objektadresse' },
+      { key: 'notes', label: 'Notizen' },
+      { key: 'amort_year', label: 'Amortisationsjahr' },
+      { key: 'npv_chf', label: 'Net Present Value (CHF)' },
+      { key: 'irr_percent', label: 'IRR (%)' },
+      { key: 'total_revenue_chf', label: 'Summe Einnahmen (CHF)' },
+      { key: 'total_capex_chf', label: 'Summe CAPEX (CHF)' },
+      { key: 'total_opex_chf', label: 'Summe OPEX (CHF)' },
+      { key: 'cashflow_table', label: 'Cashflow-Tabelle (Text)' }
+    ];
+
+    const fmt = (v, digits = 0) => isFinite(v) ? new Intl.NumberFormat('de-CH', { maximumFractionDigits: digits, minimumFractionDigits: digits }).format(v) : '–';
+
+    const PROJECT_STORE_KEY = 'sdl:projects';
+
+    let calcTimer;
+    const scheduleCalc = () => {
+      clearTimeout(calcTimer);
+      calcTimer = setTimeout(calculate, 150);
+    };
+
+    function setTemplateStatus(msg) {
+      if (templateStatus) templateStatus.value = msg;
+    }
+
+    function renderPlaceholderList() {
+      if (!placeholderList) return;
+      placeholderList.innerHTML = placeholderMeta.map(p => `<li><strong>{{${p.key}}}</strong> – ${p.label}</li>`).join('');
+    }
+
+    function getFormState() {
+      return {
+        projectName: document.getElementById('projectName')?.value || '',
+        firstName: document.getElementById('firstName')?.value || '',
+        lastName: document.getElementById('lastName')?.value || '',
+        address: document.getElementById('address')?.value || '',
+        siteAddress: document.getElementById('siteAddress')?.value || '',
+        notes: document.getElementById('notes')?.value || '',
+        capacity: document.getElementById('capacity')?.value || '',
+        capacityInterval: document.getElementById('capacityInterval')?.value || 'monat',
+        powerBase: document.getElementById('powerBase')?.value || '',
+        powerBand: document.getElementById('powerBand')?.value || '',
+        energyBase: document.getElementById('energyBase')?.value || '',
+        energyBand: document.getElementById('energyBand')?.value || '',
+        activations: document.getElementById('activations')?.value || '',
+        energyPerActivation: document.getElementById('energyPerActivation')?.value || '',
+        quantile: document.getElementById('quantile')?.value || '',
+        degradation: document.getElementById('degradation')?.value || '',
+        priceEscalation: document.getElementById('priceEscalation')?.value || '',
+        grants: document.getElementById('grants')?.value || '',
+        years: document.getElementById('years')?.value || '',
+        discount: document.getElementById('discount')?.value || '',
+        capex: readTable(capexBody, false),
+        opex: readTable(opexBody, true)
+      };
+    }
+
+    function setTable(tbody, rows, hasInterval) {
+      tbody.innerHTML = '';
+      (rows || []).forEach(row => addRow(tbody, {
+        title: row.title,
+        amount: row.amount,
+        year: row.year,
+        interval: hasInterval ? row.interval : undefined
+      }));
+    }
+
+    function applyFormState(state) {
+      if (!state) return;
+      const assign = (id, val) => { const el = document.getElementById(id); if (el) el.value = val ?? ''; };
+      assign('projectName', state.projectName);
+      assign('firstName', state.firstName);
+      assign('lastName', state.lastName);
+      assign('address', state.address);
+      assign('siteAddress', state.siteAddress);
+      assign('notes', state.notes);
+      assign('capacity', state.capacity);
+      assign('capacityInterval', state.capacityInterval);
+      assign('powerBase', state.powerBase);
+      assign('powerBand', state.powerBand);
+      assign('energyBase', state.energyBase);
+      assign('energyBand', state.energyBand);
+      assign('activations', state.activations);
+      assign('energyPerActivation', state.energyPerActivation);
+      assign('quantile', state.quantile);
+      assign('degradation', state.degradation);
+      assign('priceEscalation', state.priceEscalation);
+      assign('grants', state.grants);
+      assign('years', state.years);
+      assign('discount', state.discount);
+      setTable(capexBody, state.capex, false);
+      setTable(opexBody, state.opex, true);
+      calculate();
+    }
+
+    function loadProjects() {
+      try { return JSON.parse(localStorage.getItem(PROJECT_STORE_KEY) || '{}'); }
+      catch { return {}; }
+    }
+
+    function saveProjects(map) {
+      localStorage.setItem(PROJECT_STORE_KEY, JSON.stringify(map));
+    }
+
+    function renderProjectOptions() {
+      const map = loadProjects();
+      if (!projectSelect) return;
+      projectSelect.innerHTML = '<option value="">Projekt wählen…</option>' +
+        Object.keys(map).sort().map(k => `<option value="${k}">${k}</option>`).join('');
+    }
+
+    function addRow(tbody, defaults) {
+      const tr = document.createElement('tr');
+      tr.innerHTML = `
+        <td><input type="text" value="${defaults.title}" /></td>
+        <td><input type="number" step="0.01" value="${defaults.amount}" /></td>
+        ${defaults.interval ? `<td><input type="number" step="1" value="${defaults.interval}" /></td>` : ''}
+        <td><input type="number" step="1" value="${defaults.year}" /></td>
+        <td><span class="remove" aria-label="entfernen">✕</span></td>
+      `;
+      tbody.appendChild(tr);
+      tr.querySelector('.remove').addEventListener('click', () => { tr.remove(); scheduleCalc(); });
+    }
+
+    function seedInitialRows() {
+      addRow(capexBody, { title: 'Batteriesystem', amount: 2500000, year: 0 });
+      addRow(capexBody, { title: 'Inbetriebnahme', amount: 150000, year: 0 });
+      addRow(opexBody, { title: 'Wartung', amount: 45000, interval: 1, year: 1 });
+      addRow(opexBody, { title: 'Generalüberholung', amount: 200000, interval: 7, year: 7 });
+    }
+
+    function readTable(tbody, hasInterval = false) {
+      return Array.from(tbody.querySelectorAll('tr')).map(tr => {
+        const inputs = tr.querySelectorAll('input');
+        return {
+          title: inputs[0].value || 'Position',
+          amount: Number(inputs[1].value) || 0,
+          interval: hasInterval ? (Number(inputs[2].value) || 1) : null,
+          year: Number(inputs[hasInterval ? 3 : 2].value) || 0
+        };
+      });
+    }
+
+    function scenarioValue(base, bandPercent, slider) {
+      const spread = Math.max(0, bandPercent) / 100;
+      const tilt = (slider - 50) / 50; // -1..1
+      const factor = 1 + spread * tilt;
+      return Math.max(0, base * factor);
+    }
+
+    function buildReplacements({ rows, amortYear, npv, irr, powerPrice, energyPrice, q, totals, inputs }) {
+      const cashTable = ['Jahr;Einnahmen;CAPEX;OPEX;Cashflow;Kumuliert']
+        .concat(rows.map(r => `${r.year};${fmt(r.revenue,0)};${fmt(r.capex,0)};${fmt(r.opex,0)};${fmt(r.cashflow,0)};${fmt(r.cumulative,0)}`))
+        .join('\n');
+
+      return {
+        scenario_percent: q,
+        power_price_chf: fmt(powerPrice, 2),
+        energy_price_chf: fmt(energyPrice, 2),
+        capacity_mw: fmt(inputs.capacity, 2),
+        activations_per_year: fmt(inputs.activations, 0),
+        energy_per_activation_mwh: fmt(inputs.energyPerAct, 2),
+        power_base_chf: fmt(inputs.powerBase, 2),
+        power_band_percent: fmt(inputs.powerBand, 1),
+        energy_base_chf: fmt(inputs.energyBase, 2),
+        energy_band_percent: fmt(inputs.energyBand, 1),
+        price_escalation_percent: fmt(inputs.escalation * 100, 2),
+        degradation_percent: fmt(inputs.degradation * 100, 2),
+        discount_percent: fmt(inputs.discount * 100, 2),
+        grants_chf: fmt(inputs.grants, 2),
+        project: inputs.projectName || '',
+        first_name: inputs.firstName || '',
+        last_name: inputs.lastName || '',
+        address: inputs.address || '',
+        site_address: inputs.siteAddress || '',
+        notes: inputs.notes || '',
+        amort_year: amortYear ?? 'nicht erreicht',
+        npv_chf: fmt(npv, 0),
+        irr_percent: Number.isFinite(irr) ? (irr * 100).toFixed(2) : 'nicht definiert',
+        total_revenue_chf: fmt(totals.revenue, 0),
+        total_capex_chf: fmt(totals.capex, 0),
+        total_opex_chf: fmt(totals.opex, 0),
+        cashflow_table: cashTable
+      };
+    }
+
+    function calculate() {
+      const years = Math.max(1, Number(document.getElementById('years').value) || 1);
+      const degradation = (Number(document.getElementById('degradation').value) || 0) / 100;
+      const escalation = (Number(document.getElementById('priceEscalation').value) || 0) / 100;
+      const discount = (Number(document.getElementById('discount').value) || 0) / 100;
+      const grants = Number(document.getElementById('grants').value) || 0;
+      const q = Number(document.getElementById('quantile').value) || 50;
+      scenarioTag.textContent = `Szenario: ${q}%`;
+
+      const capex = readTable(capexBody, false);
+      const opex = readTable(opexBody, true);
+
+      const projectName = document.getElementById('projectName')?.value || '';
+      const firstName = document.getElementById('firstName')?.value || '';
+      const lastName = document.getElementById('lastName')?.value || '';
+      const address = document.getElementById('address')?.value || '';
+      const siteAddress = document.getElementById('siteAddress')?.value || '';
+      const notes = document.getElementById('notes')?.value || '';
+
+      const capacity = Number(document.getElementById('capacity').value) || 0;
+      const capInterval = document.getElementById('capacityInterval').value;
+      const powerBase = Number(document.getElementById('powerBase').value) || 0;
+      const powerBand = Number(document.getElementById('powerBand').value) || 0;
+      const energyBase = Number(document.getElementById('energyBase').value) || 0;
+      const energyBand = Number(document.getElementById('energyBand').value) || 0;
+      const powerPrice = scenarioValue(powerBase, powerBand, q);
+      const energyPrice = scenarioValue(energyBase, energyBand, q);
+      const activations = Number(document.getElementById('activations').value) || 0;
+      const energyPerAct = Number(document.getElementById('energyPerActivation').value) || 0;
+
+      const yearsArr = Array.from({ length: years + 1 }, (_, i) => i); // Jahr 0 inkludiert
+      const rows = yearsArr.map(year => {
+        const escalationFactor = Math.pow(1 + escalation, Math.max(year - 1, 0));
+        const degradationFactor = Math.pow(1 - degradation, Math.max(year - 1, 0));
+
+        const perfBase = capacity * powerPrice * (capInterval === 'monat' ? 12 : 1);
+        const energyRevenue = activations * energyPerAct * energyPrice;
+        const revenue = (perfBase + energyRevenue) * escalationFactor * degradationFactor + (year === 0 ? 0 : grants);
+
+        const capexCost = capex
+          .filter(c => c.year === year)
+          .reduce((sum, c) => sum + c.amount, 0);
+
+        const opexCost = opex
+          .filter(o => year >= o.year && ((year - o.year) % o.interval === 0))
+          .reduce((sum, o) => sum + o.amount, 0);
+
+        const cashflow = revenue - capexCost - opexCost;
+        return { year, revenue, capex: capexCost, opex: opexCost, cashflow };
+      });
+
+      let cumulative = 0;
+      rows.forEach(r => { cumulative += r.cashflow; r.cumulative = cumulative; });
+
+      const amortYear = rows.find(r => r.cumulative >= 0)?.year ?? null;
+      const npv = rows.reduce((sum, r) => sum + r.cashflow / Math.pow(1 + discount, r.year), 0);
+      const irr = computeIRR(rows.map(r => r.cashflow));
+
+      renderMetrics({ rows, amortYear, npv, irr, powerPrice, energyPrice, q, inputs: { capacity, activations, energyPerAct, powerBase, powerBand, energyBase, energyBand, escalation, degradation, discount, grants, projectName, firstName, lastName, address, siteAddress, notes } });
+      renderChart(rows);
+      renderSensitivity({ baseRows: rows, price: powerPrice, energy: energyPrice, q, discount, capInterval, capacity, activations, energyPerAct, escalation, degradation, grants, capex, opex, years });
+
+      return { rows, amortYear, npv, irr };
+    }
+
+    function renderMetrics({ rows, amortYear, npv, irr, powerPrice, energyPrice, q, inputs }) {
+      const totalRevenue = rows.reduce((s, r) => s + r.revenue, 0);
+      const totalCapex = rows.reduce((s, r) => s + r.capex, 0);
+      const totalOpex = rows.reduce((s, r) => s + r.opex, 0);
+
+      const cards = [
+        { title: 'Amortisationsjahr', value: amortYear ?? 'nicht erreicht' },
+        { title: `NPV (${fmt(document.getElementById('discount').value)} % Diskont)`, value: `${fmt(npv,0)} CHF` },
+        { title: 'IRR (intern)', value: Number.isFinite(irr) ? `${(irr*100).toFixed(2)} %` : 'nicht definiert' },
+        { title: 'Summe Einnahmen', value: `${fmt(totalRevenue,0)} CHF` },
+        { title: 'Summe CAPEX', value: `${fmt(totalCapex,0)} CHF` },
+        { title: 'Summe OPEX', value: `${fmt(totalOpex,0)} CHF` },
+        { title: 'Aktuelles Szenario', value: `Leistung ${fmt(powerPrice,0)} · Arbeit ${fmt(energyPrice,0)}` }
+      ];
+
+      metricsBox.innerHTML = cards.map(c => `
+        <div class="metric">
+          <h3>${c.title}</h3>
+          <div class="value">${c.value}</div>
+        </div>
+      `).join('');
+
+      const replacements = buildReplacements({
+        rows,
+        amortYear,
+        npv,
+        irr,
+        powerPrice,
+        energyPrice,
+        q,
+        totals: { revenue: totalRevenue, capex: totalCapex, opex: totalOpex },
+        inputs: inputs || {}
+      });
+      lastCalc = { replacements };
+    }
+
+    function renderChart(rows) {
+      const ctx = document.getElementById('cashChart').getContext('2d');
+      const labels = rows.map(r => `Jahr ${r.year}`);
+      const cash = rows.map(r => r.cashflow);
+      const cum = rows.map(r => r.cumulative);
+      const revenues = rows.map(r => r.revenue);
+      const capex = rows.map(r => -r.capex); // negativ für Stapel
+      const opex = rows.map(r => -r.opex);
+
+      if (chart) chart.destroy();
+      chart = new Chart(ctx, {
+        type: 'bar',
+        data: {
+          labels,
+          datasets: [
+            { type: 'bar', label: 'Einnahmen', data: revenues, backgroundColor: 'rgba(77,172,66,0.45)', borderColor: '#4dac42', borderWidth: 1 },
+            { type: 'bar', label: 'CAPEX', data: capex, backgroundColor: 'rgba(255,99,132,0.35)', borderColor: '#ff6384', borderWidth: 1 },
+            { type: 'bar', label: 'OPEX', data: opex, backgroundColor: 'rgba(255,159,64,0.35)', borderColor: '#ff9f40', borderWidth: 1 },
+            { type: 'line', label: 'Cashflow', data: cash, borderColor: '#2f855a', backgroundColor: 'rgba(47,133,90,0.2)', tension: 0.15, yAxisID: 'y' },
+            { type: 'line', label: 'Kumulierter Cashflow', data: cum, borderColor: '#62c158', backgroundColor: 'rgba(98,193,88,0.2)', tension: 0.15, yAxisID: 'y' }
+          ]
+        },
+        options: {
+          responsive: true,
+          plugins: { legend: { labels: { color: '#2d3a2c' } } },
+          scales: {
+            x: { stacked: true, ticks: { color: '#2d3a2c' }, grid: { color: 'rgba(0,0,0,0.05)' } },
+            y: { stacked: true, ticks: { color: '#2d3a2c' }, grid: { color: 'rgba(0,0,0,0.05)' } }
+          }
+        }
+      });
+    }
+
+    function computeIRR(cashflows) {
+      // Newton-Raphson with guard rails against division by zero / divergence
+      let rate = 0.05;
+      for (let i = 0; i < 80; i++) {
+        const npv = cashflows.reduce((s, cf, idx) => s + cf / Math.pow(1 + rate, idx), 0);
+        const derivative = cashflows.reduce((s, cf, idx) => s - idx * cf / Math.pow(1 + rate, idx + 1), 0);
+        if (Math.abs(derivative) < 1e-9) return NaN;
+        const newRate = rate - npv / derivative;
+        if (!Number.isFinite(newRate)) return NaN;
+        if (Math.abs(newRate - rate) < 1e-6) return newRate;
+        rate = newRate;
+      }
+      return NaN;
+    }
+
+    function buildRowsForFactors({ priceFactor, activationFactor, base }) {
+      const { capInterval, capacity, powerPrice, energyPrice, activations, energyPerAct, escalation, degradation, grants, capex, opex, years } = base;
+      const perfPrice = powerPrice * priceFactor;
+      const workPrice = energyPrice * priceFactor;
+      const acts = activations * activationFactor;
+
+      const yearsArr = Array.from({ length: years + 1 }, (_, i) => i);
+      return yearsArr.map(year => {
+        const escalationFactor = Math.pow(1 + escalation, Math.max(year - 1, 0));
+        const degradationFactor = Math.pow(1 - degradation, Math.max(year - 1, 0));
+        const perfBase = capacity * perfPrice * (capInterval === 'monat' ? 12 : 1);
+        const energyRevenue = acts * energyPerAct * workPrice;
+        const revenue = (perfBase + energyRevenue) * escalationFactor * degradationFactor + (year === 0 ? 0 : grants);
+
+        const capexCost = capex.filter(c => c.year === year).reduce((sum, c) => sum + c.amount, 0);
+        const opexCost = opex.filter(o => year >= o.year && ((year - o.year) % o.interval === 0)).reduce((sum, o) => sum + o.amount, 0);
+        return revenue - capexCost - opexCost;
+      });
+    }
+
+    function renderSensitivity({ baseRows, price, energy, q, discount, capInterval, capacity, activations, energyPerAct, escalation, degradation, grants, capex, opex, years }) {
+      const factors = [0.9, 1.0, 1.1];
+      const actFactors = [0.8, 1.0, 1.2];
+      sensitivityBody.innerHTML = '';
+
+      factors.forEach(pf => {
+        actFactors.forEach(af => {
+          const rows = buildRowsForFactors({ priceFactor: pf, activationFactor: af, base: { capInterval, capacity, powerPrice: price, energyPrice: energy, activations, energyPerAct, escalation, degradation, grants, capex, opex, years } });
+          const npv = rows.reduce((sum, cf, idx) => sum + cf / Math.pow(1 + discount, idx), 0);
+          const tr = document.createElement('tr');
+          tr.innerHTML = `<td>${(pf*100).toFixed(0)}%</td><td>${(af*100).toFixed(0)}%</td><td>${fmt(npv,0)}</td>`;
+          sensitivityBody.appendChild(tr);
+        });
+      });
+    }
+
+    function applyTemplate(content, replacements) {
+      let output = content;
+      Object.entries(replacements || {}).forEach(([key, value]) => {
+        const safeVal = value === undefined ? '' : value;
+        output = output.replace(new RegExp(`{{\\s*${key}\\s*}}`, 'g'), safeVal);
+      });
+      return output;
+    }
+
+    function exportDoc() {
+      if (!templateContent) {
+        alert('Bitte zuerst eine Word-Vorlage laden.');
+        setTemplateStatus('Keine Vorlage geladen');
+        return;
+      }
+      if (!lastCalc?.replacements) calculate();
+      try {
+        const filled = applyTemplate(templateContent, lastCalc?.replacements || {});
+        // Wenn die Vorlage bereits ein vollständiges HTML-Dokument ist, nicht doppelt umbrechen
+        const isFullHtml = /<html[\s\S]*<\/html>/i.test(filled);
+        const htmlDoc = isFullHtml ? filled : `<!doctype html><html><head><meta charset="utf-8"></head><body>${filled}</body></html>`;
+        const blob = new Blob(['\ufeff' + htmlDoc], { type: 'application/msword' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        const proj = (document.getElementById('projectName')?.value || 'Projekt').replace(/[^\w\-]+/g, '_') || 'Projekt';
+        a.download = `${proj}_Berechnung_SDL_Systemdienstleistung.doc`;
+        a.click();
+        URL.revokeObjectURL(url);
+        setTemplateStatus('Export erstellt');
+      } catch (err) {
+        console.error(err);
+        setTemplateStatus('Fehler beim Export');
+        alert('Export fehlgeschlagen. Bitte HTML/TXT-Vorlage nutzen.');
+      }
+    }
+
+    document.getElementById('addCapex').addEventListener('click', () => { addRow(capexBody, { title: 'Neue Position', amount: 0, year: 0 }); scheduleCalc(); });
+    document.getElementById('addOpex').addEventListener('click', () => { addRow(opexBody, { title: 'Neue Position', amount: 0, interval: 1, year: 1 }); scheduleCalc(); });
+    document.getElementById('btnCalc').addEventListener('click', calculate);
+    document.getElementById('quantile').addEventListener('input', e => { scenarioTag.textContent = `Szenario: ${e.target.value}%`; scheduleCalc(); });
+    templateInput.addEventListener('change', e => {
+      const file = e.target.files?.[0];
+      if (!file) return;
+      const ext = (file.name.split('.').pop() || '').toLowerCase();
+
+      const markBinaryError = () => {
+        alert('DOCX bitte als "Webseite (gefiltert)" oder "Word XML" exportieren, damit Platzhalter als Text vorliegen.');
+        setTemplateStatus('DOCX binär – bitte als HTML/TXT speichern');
+        btnExportDoc.disabled = true;
+      };
+
+      // First check a small slice to see if it is a binary (PK header for real DOCX)
+      if (ext === 'docx') {
+        const headerReader = new FileReader();
+        headerReader.onload = () => {
+          const arr = new Uint8Array(headerReader.result);
+          const hasPK = arr[0] === 0x50 && arr[1] === 0x4b;
+          if (hasPK) { markBinaryError(); return; }
+          // If not PK, treat as text
+          const textReader = new FileReader();
+          textReader.onload = () => {
+            templateContent = textReader.result;
+            setTemplateStatus(`${file.name} geladen`);
+            btnExportDoc.disabled = false;
+          };
+          textReader.readAsText(file);
+        };
+        headerReader.readAsArrayBuffer(file.slice(0, 4));
+        return;
+      }
+
+      const reader = new FileReader();
+      reader.onload = () => {
+        templateContent = reader.result;
+        setTemplateStatus(`${file.name} geladen`);
+        btnExportDoc.disabled = false;
+      };
+      reader.readAsText(file);
+    });
+    btnExportDoc.addEventListener('click', exportDoc);
+    const autoFields = ['projectName','firstName','lastName','address','siteAddress','notes','capacity','capacityInterval','powerBase','powerBand','energyBase','energyBand','activations','energyPerActivation','quantile','degradation','priceEscalation','grants','years','discount'];
+    autoFields.forEach(id => { const el = document.getElementById(id); if (el) el.addEventListener('input', scheduleCalc); });
+    capexBody.addEventListener('input', scheduleCalc);
+    opexBody.addEventListener('input', scheduleCalc);
+
+    btnSaveProject.addEventListener('click', () => {
+      const state = getFormState();
+      if (!state.projectName) { alert('Bitte Projektnamen angeben.'); return; }
+      const map = loadProjects();
+      map[state.projectName] = state;
+      saveProjects(map);
+      renderProjectOptions();
+      setTemplateStatus('Projekt gespeichert');
+    });
+    btnLoadProject.addEventListener('click', () => {
+      const sel = projectSelect?.value;
+      const map = loadProjects();
+      if (sel && map[sel]) {
+        applyFormState(map[sel]);
+        setTemplateStatus(`Projekt ${sel} geladen`);
+      } else {
+        alert('Bitte ein gespeichertes Projekt wählen.');
+      }
+    });
+
+    seedInitialRows();
+    renderPlaceholderList();
+    renderProjectOptions();
+    calculate();
+  </script>
+</body>
+</html>
